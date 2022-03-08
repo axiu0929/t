@@ -62,6 +62,40 @@ char receive_byte(void)
     
 }     
 
+void Test1()
+{
+    send_byte('S');
+    send_byte(receive_byte());
+}
+
+void func()
+{
+    const char* API = "ADD+TEST1";
+
+    const int32_t buffer_size = 20;
+    char buffer[buffer_size];
+
+    for (int32_t i = 0; i < buffer_size; i++)
+    {
+        buffer[i] = receive_byte();
+        //send_byte('R');
+        //send_byte(buffer[i]);
+        
+        if ( (buffer[i] == 0x0D) ) {
+            buffer[i] = '\0';
+            break;
+        }
+        
+    }
+
+    if ( strcmp(buffer, API) == 0 ) {
+        Test1();
+    }
+    else {
+        send_byte('F');
+    }
+    
+}
 
 void app_main(void)
 {
@@ -96,8 +130,17 @@ void app_main(void)
     */
 
     // receive
+    
+    /*
     send_byte('T');
     for (;;) {
         send_byte(receive_byte());
     }
+    */
+
+   // call API
+   for (;;) {
+       func();
+   }
+   //func();
 }
