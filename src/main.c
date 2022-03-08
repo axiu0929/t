@@ -204,14 +204,14 @@ void app_main(void)
         do 
         {
             byte = ringbuffer_produce(&b);
-        }while (byte != 0x0D);
-        
+        }while (byte != 0x0D);  
+
+        do 
+        {
+            byte = ringbuffer_produce(&b);
+        }while (byte != 0x0D);       
+
         ringbuffer_consume(&b);
-        
-       //send_byte(ringbuffer_produce(&b));
+    
     }
-    
-    
-    
-   
 }
