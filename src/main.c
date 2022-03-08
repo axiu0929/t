@@ -12,6 +12,8 @@
 #define GPIO_INPUT_IO        GPIO_NUM_4
 #define GPIO_INPUT_PIN_SEL   (1ULL<<GPIO_OUTPUT_IO)
 
+#define CAPACITY             20
+
 void send_byte(char data)
 {
     uint32_t const delay = 1000000 / 9600;
@@ -97,6 +99,52 @@ void func()
     
 }
 
+typedef struct ringbuffer
+{
+    int32_t head;
+    int32_t tail;
+    char thebuffer[CAPACITY+1];
+}Ringbuffer;
+void ringbuffer_set(Ringbuffer *buffer)
+{
+    buffer->head = -1;
+    buffer->tail = -1;
+}
+int32_t ringbuffer_add(Ringbuffer *buffer, char byte)
+{
+    // if full return 0
+    buffer->tail = (buffer->tail + 1) % CAPACITY;
+    (buffer->thebuffer)[buffer->tail] = byte;
+    return 1;
+}
+char ringbuffer_del(Ringbuffer *buffer)
+{
+    if (buffer->head == buffer->tail) {
+        return 0; //buffer is empty
+    }
+    else {
+        buffer->head = (buffer->head + 1) % CAPACITY;
+        return (buffer->thebuffer)[buffer->head];
+    }
+}
+
+char ringbuffer_produce(Ringbuffer *buffer)
+{
+    char byte = receive_byte();
+    ringbuffer_add(buffer, byte);
+    return byte;
+}
+void ringbuffer_consume(Ringbuffer *buffer)
+{
+    char byte = ringbuffer_del(buffer);
+    while ( (byte != 0) && (byte != 0x0D) )
+    {
+        send_byte(byte);
+        byte = ringbuffer_del(buffer);
+    }
+    
+}
+
 void app_main(void)
 {
     gpio_config_t io_conf = {};
@@ -137,10 +185,33 @@ void app_main(void)
         send_byte(receive_byte());
     }
     */
-
-   // call API
-   for (;;) {
-       func();
-   }
-   //func();
+    
+    // call API
+    // func();
+    
+    // ring buffer
+    
+    Ringbuffer b;
+    ringbuffer_set(&b);
+    char byte;
+    
+    //ringbuffer_produce(&b);
+    //ringbuffer_consume(&b);
+    
+    for (;;)
+    {
+        
+        do 
+        {
+            byte = ringbuffer_produce(&b);
+        }while (byte != 0x0D);
+        
+        ringbuffer_consume(&b);
+        
+       //send_byte(ringbuffer_produce(&b));
+    }
+    
+    
+    
+   
 }
