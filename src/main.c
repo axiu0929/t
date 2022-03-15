@@ -14,12 +14,14 @@
 
 #define CAPACITY             20
 
+#define ESP_INTR_FLAG_DEFAULT 0
+
 void send_byte(char data)
 {
     uint32_t const delay = 1000000 / 9600;
     
     gpio_set_level(GPIO_OUTPUT_IO, 0); // send_startbit
-    gpio_set_level(GPIO_OUTPUT_TEST, 1);
+    //gpio_set_level(GPIO_OUTPUT_TEST, 1);
     ets_delay_us(delay);
 
     for (int i = 0; i < 8; ++i) 
@@ -31,7 +33,7 @@ void send_byte(char data)
     }
     
     gpio_set_level(GPIO_OUTPUT_IO, 1); // send_stopbit
-    gpio_set_level(GPIO_OUTPUT_TEST, 0);
+    //gpio_set_level(GPIO_OUTPUT_TEST, 0);
     ets_delay_us(delay);
     //ets_delay_us(delay);
 }
@@ -145,21 +147,34 @@ void ringbuffer_consume(Ringbuffer *buffer)
     
 }
 
+void receive_handler(void* arg)
+{
+    arg++;
+    //gpio_uninstall_isr_service();
+    //send_byte('R');
+    //receive_byte();
+    //gpio_install_isr_service(ESP_INTR_FLAG_DEFAULT);
+}
+
 void app_main(void)
 {
     gpio_config_t io_conf = {};
-    io_conf.intr_type = GPIO_INTR_DISABLE;
-    io_conf.mode = GPIO_MODE_OUTPUT;
-    io_conf.pin_bit_mask = GPIO_OUTPUT_PIN_SEL;
+    io_conf.intr_type = GPIO_INTR_NEGEDGE;
+    io_conf.mode = GPIO_MODE_INPUT_OUTPUT;
+    io_conf.pin_bit_mask = (GPIO_OUTPUT_PIN_SEL | GPIO_INPUT_PIN_SEL);
     io_conf.pull_down_en = 0;
     io_conf.pull_up_en = 0;
     gpio_config(&io_conf);
     
+    gpio_set_direction(GPIO_INPUT_IO, GPIO_MODE_INPUT);
+    gpio_set_direction(GPIO_OUTPUT_IO, GPIO_MODE_OUTPUT);
+    //gpio_set_direction(GPIO_OUTPUT_TEST, GPIO_MODE_OUTPUT);    
+
     gpio_set_level(GPIO_OUTPUT_IO, 1);
     vTaskDelay (1);
     
     // send   
-    gpio_set_level(GPIO_OUTPUT_TEST, 0);
+    //gpio_set_level(GPIO_OUTPUT_TEST, 0);
     
     /*
     for (;;) {
@@ -189,8 +204,19 @@ void app_main(void)
     // call API
     // func();
     
+    // isr
+    static int32_t count = 0x41;
+    send_byte('T');
+    gpio_install_isr_service(ESP_INTR_FLAG_DEFAULT);
+    gpio_isr_handler_add(GPIO_INPUT_IO, receive_handler, &count);
+    send_byte('t');
+    for (;;)
+    {
+        send_byte(count);
+    }
+
     // ring buffer
-    
+    /*
     Ringbuffer b;
     ringbuffer_set(&b);
     char byte;
@@ -214,4 +240,5 @@ void app_main(void)
         ringbuffer_consume(&b);
     
     }
+    */
 }
