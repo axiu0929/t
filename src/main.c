@@ -1,244 +1,150 @@
+/* UART Events Example
+
+   This example code is in the Public Domain (or CC0 licensed, at your option.)
+
+   Unless required by applicable law or agreed to in writing, this
+   software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+   CONDITIONS OF ANY KIND, either express or implied.
+*/
+#include <stdio.h>
 #include <string.h>
 #include "freertos/FreeRTOS.h"
-#include "freertos/event_groups.h"
+#include "freertos/task.h"
+#include "freertos/queue.h"
+#include "driver/uart.h"
 #include "esp_log.h"
-#include "driver/gpio.h"
-#include <rom/ets_sys.h>
 
-#define GPIO_OUTPUT_IO       GPIO_NUM_3
-#define GPIO_OUTPUT_TEST     GPIO_NUM_27
-#define GPIO_OUTPUT_PIN_SEL  ((1ULL<<GPIO_OUTPUT_IO) | (1ULL<<GPIO_OUTPUT_TEST))
+static const char *TAG = "uart_events";
 
-#define GPIO_INPUT_IO        GPIO_NUM_4
-#define GPIO_INPUT_PIN_SEL   (1ULL<<GPIO_OUTPUT_IO)
+/**
+ * This example shows how to use the UART driver to handle special UART events.
+ *
+ * It also reads data from UART0 directly, and echoes it to console.
+ *
+ * - Port: UART0
+ * - Receive (Rx) buffer: on
+ * - Transmit (Tx) buffer: off
+ * - Flow control: off
+ * - Event queue: on
+ * - Pin assignment: TxD (default), RxD (default)
+ */
 
-#define CAPACITY             20
+#define EX_UART_NUM UART_NUM_0
+#define PATTERN_CHR_NUM    (3)         /*!< Set the number of consecutive and identical characters received by receiver which defines a UART pattern*/
 
-#define ESP_INTR_FLAG_DEFAULT 0
+#define BUF_SIZE (1024)
+#define RD_BUF_SIZE (BUF_SIZE)
+static QueueHandle_t uart0_queue;
 
-void send_byte(char data)
+static void uart_event_task(void *pvParameters)
 {
-    uint32_t const delay = 1000000 / 9600;
-    
-    gpio_set_level(GPIO_OUTPUT_IO, 0); // send_startbit
-    //gpio_set_level(GPIO_OUTPUT_TEST, 1);
-    ets_delay_us(delay);
-
-    for (int i = 0; i < 8; ++i) 
-    {
-        char bit_HL = data & 1;
-        data = data >> 1;
-        gpio_set_level(GPIO_OUTPUT_IO, bit_HL); // send_onedatabit
-        ets_delay_us(delay);
-    }
-    
-    gpio_set_level(GPIO_OUTPUT_IO, 1); // send_stopbit
-    //gpio_set_level(GPIO_OUTPUT_TEST, 0);
-    ets_delay_us(delay);
-    //ets_delay_us(delay);
-}
-
-char receive_byte(void)
-{
-    uint32_t const delay = 1000000 / 9600;
-    gpio_set_direction(GPIO_INPUT_IO, GPIO_MODE_INPUT);
-    char data = 0;
-    
-    while (1)
-    {
-        if (gpio_get_level(GPIO_INPUT_IO) == 0) {
-            //gpio_set_level(GPIO_OUTPUT_TEST, 1);
-            ets_delay_us(delay*3/2);
-            
-            for (int i = 0; i < 8; ++i) 
-            {
-                char bit_HL = gpio_get_level(GPIO_INPUT_IO);
-                bit_HL = bit_HL << i;
-                data = data | bit_HL;
-                ets_delay_us(delay);
+    uart_event_t event;
+    size_t buffered_size;
+    uint8_t* dtmp = (uint8_t*) malloc(RD_BUF_SIZE);
+    for(;;) {
+        //Waiting for UART event.
+        if(xQueueReceive(uart0_queue, (void * )&event, (portTickType)portMAX_DELAY)) {
+            bzero(dtmp, RD_BUF_SIZE);
+            ESP_LOGI(TAG, "uart[%d] event:", EX_UART_NUM);
+            switch(event.type) {
+                //Event of UART receving data
+                /*We'd better handler data event fast, there would be much more data events than
+                other types of events. If we take too much time on data event, the queue might
+                be full.*/
+                case UART_DATA:
+                    ESP_LOGI(TAG, "[UART DATA]: %d", event.size);
+                    uart_read_bytes(EX_UART_NUM, dtmp, event.size, portMAX_DELAY);
+                    ESP_LOGI(TAG, "[DATA EVT]:");
+                    uart_write_bytes(EX_UART_NUM, (const char*) dtmp, event.size);
+                    break;
+                //Event of HW FIFO overflow detected
+                case UART_FIFO_OVF:
+                    ESP_LOGI(TAG, "hw fifo overflow");
+                    // If fifo overflow happened, you should consider adding flow control for your application.
+                    // The ISR has already reset the rx FIFO,
+                    // As an example, we directly flush the rx buffer here in order to read more data.
+                    uart_flush_input(EX_UART_NUM);
+                    xQueueReset(uart0_queue);
+                    break;
+                //Event of UART ring buffer full
+                case UART_BUFFER_FULL:
+                    ESP_LOGI(TAG, "ring buffer full");
+                    // If buffer full happened, you should consider encreasing your buffer size
+                    // As an example, we directly flush the rx buffer here in order to read more data.
+                    uart_flush_input(EX_UART_NUM);
+                    xQueueReset(uart0_queue);
+                    break;
+                //Event of UART RX break detected
+                case UART_BREAK:
+                    ESP_LOGI(TAG, "uart rx break");
+                    break;
+                //Event of UART parity check error
+                case UART_PARITY_ERR:
+                    ESP_LOGI(TAG, "uart parity error");
+                    break;
+                //Event of UART frame error
+                case UART_FRAME_ERR:
+                    ESP_LOGI(TAG, "uart frame error");
+                    break;
+                //UART_PATTERN_DET
+                case UART_PATTERN_DET:
+                    uart_get_buffered_data_len(EX_UART_NUM, &buffered_size);
+                    int pos = uart_pattern_pop_pos(EX_UART_NUM);
+                    ESP_LOGI(TAG, "[UART PATTERN DETECTED] pos: %d, buffered size: %d", pos, buffered_size);
+                    if (pos == -1) {
+                        // There used to be a UART_PATTERN_DET event, but the pattern position queue is full so that it can not
+                        // record the position. We should set a larger queue size.
+                        // As an example, we directly flush the rx buffer here.
+                        uart_flush_input(EX_UART_NUM);
+                    } else {
+                        uart_read_bytes(EX_UART_NUM, dtmp, pos, 100 / portTICK_PERIOD_MS);
+                        uint8_t pat[PATTERN_CHR_NUM + 1];
+                        memset(pat, 0, sizeof(pat));
+                        uart_read_bytes(EX_UART_NUM, pat, PATTERN_CHR_NUM, 100 / portTICK_PERIOD_MS);
+                        ESP_LOGI(TAG, "read data: %s", dtmp);
+                        ESP_LOGI(TAG, "read pat : %s", pat);
+                    }
+                    break;
+                //Others
+                default:
+                    ESP_LOGI(TAG, "uart event type: %d", event.type);
+                    break;
             }
-
-            //gpio_set_level(GPIO_OUTPUT_TEST, 0);
-            return data;
         }
     }
-    return 't';
-    
-}     
-
-void Test1()
-{
-    send_byte('S');
-    send_byte(receive_byte());
-}
-
-void func()
-{
-    const char* API = "ADD+TEST1";
-
-    const int32_t buffer_size = 20;
-    char buffer[buffer_size];
-
-    for (int32_t i = 0; i < buffer_size; i++)
-    {
-        buffer[i] = receive_byte();
-        //send_byte('R');
-        //send_byte(buffer[i]);
-        
-        if ( (buffer[i] == 0x0D) ) {
-            buffer[i] = '\0';
-            break;
-        }
-        
-    }
-
-    if ( strcmp(buffer, API) == 0 ) {
-        Test1();
-    }
-    else {
-        send_byte('F');
-    }
-    
-}
-
-typedef struct ringbuffer
-{
-    int32_t head;
-    int32_t tail;
-    char thebuffer[CAPACITY+1];
-}Ringbuffer;
-void ringbuffer_set(Ringbuffer *buffer)
-{
-    buffer->head = -1;
-    buffer->tail = -1;
-}
-int32_t ringbuffer_add(Ringbuffer *buffer, char byte)
-{
-    // if full return 0
-    buffer->tail = (buffer->tail + 1) % CAPACITY;
-    (buffer->thebuffer)[buffer->tail] = byte;
-    return 1;
-}
-char ringbuffer_del(Ringbuffer *buffer)
-{
-    if (buffer->head == buffer->tail) {
-        return 0; //buffer is empty
-    }
-    else {
-        buffer->head = (buffer->head + 1) % CAPACITY;
-        return (buffer->thebuffer)[buffer->head];
-    }
-}
-
-char ringbuffer_produce(Ringbuffer *buffer)
-{
-    char byte = receive_byte();
-    ringbuffer_add(buffer, byte);
-    return byte;
-}
-void ringbuffer_consume(Ringbuffer *buffer)
-{
-    char byte = ringbuffer_del(buffer);
-    while ( (byte != 0) && (byte != 0x0D) )
-    {
-        send_byte(byte);
-        byte = ringbuffer_del(buffer);
-    }
-    
-}
-
-void receive_handler(void* arg)
-{
-    arg++;
-    //gpio_uninstall_isr_service();
-    //send_byte('R');
-    //receive_byte();
-    //gpio_install_isr_service(ESP_INTR_FLAG_DEFAULT);
+    free(dtmp);
+    dtmp = NULL;
+    vTaskDelete(NULL);
 }
 
 void app_main(void)
 {
-    gpio_config_t io_conf = {};
-    io_conf.intr_type = GPIO_INTR_NEGEDGE;
-    io_conf.mode = GPIO_MODE_INPUT_OUTPUT;
-    io_conf.pin_bit_mask = (GPIO_OUTPUT_PIN_SEL | GPIO_INPUT_PIN_SEL);
-    io_conf.pull_down_en = 0;
-    io_conf.pull_up_en = 0;
-    gpio_config(&io_conf);
-    
-    gpio_set_direction(GPIO_INPUT_IO, GPIO_MODE_INPUT);
-    gpio_set_direction(GPIO_OUTPUT_IO, GPIO_MODE_OUTPUT);
-    //gpio_set_direction(GPIO_OUTPUT_TEST, GPIO_MODE_OUTPUT);    
+    esp_log_level_set(TAG, ESP_LOG_INFO);
 
-    gpio_set_level(GPIO_OUTPUT_IO, 1);
-    vTaskDelay (1);
-    
-    // send   
-    //gpio_set_level(GPIO_OUTPUT_TEST, 0);
-    
-    /*
-    for (;;) {
-        send_byte(0x78);
-        //send_byte(receive_byte());
-    } 
-    */
+    /* Configure parameters of an UART driver,
+     * communication pins and install the driver */
+    uart_config_t uart_config = {
+        .baud_rate = 115200,
+        .data_bits = UART_DATA_8_BITS,
+        .parity = UART_PARITY_DISABLE,
+        .stop_bits = UART_STOP_BITS_1,
+        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
+        .source_clk = UART_SCLK_APB,
+    };
+    //Install UART driver, and get the queue.
+    uart_driver_install(EX_UART_NUM, BUF_SIZE * 2, BUF_SIZE * 2, 20, &uart0_queue, 0);
+    uart_param_config(EX_UART_NUM, &uart_config);
 
-    /*
-    for (int c = 65; c < 91; ++c) {
-        send_byte(c);
-    }  
-    for (int c = 97; c < 123; ++c) {
-        send_byte(c);
-    } 
-    */
+    //Set UART log level
+    esp_log_level_set(TAG, ESP_LOG_INFO);
+    //Set UART pins (using UART0 default pins ie no changes.)
+    uart_set_pin(EX_UART_NUM, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
 
-    // receive
-    
-    /*
-    send_byte('T');
-    for (;;) {
-        send_byte(receive_byte());
-    }
-    */
-    
-    // call API
-    // func();
-    
-    // isr
-    static int32_t count = 0x41;
-    send_byte('T');
-    gpio_install_isr_service(ESP_INTR_FLAG_DEFAULT);
-    gpio_isr_handler_add(GPIO_INPUT_IO, receive_handler, &count);
-    send_byte('t');
-    for (;;)
-    {
-        send_byte(count);
-    }
+    //Set uart pattern detect function.
+    uart_enable_pattern_det_baud_intr(EX_UART_NUM, '+', PATTERN_CHR_NUM, 9, 0, 0);
+    //Reset the pattern queue length to record at most 20 pattern positions.
+    uart_pattern_queue_reset(EX_UART_NUM, 20);
 
-    // ring buffer
-    /*
-    Ringbuffer b;
-    ringbuffer_set(&b);
-    char byte;
-    
-    //ringbuffer_produce(&b);
-    //ringbuffer_consume(&b);
-    
-    for (;;)
-    {
-        
-        do 
-        {
-            byte = ringbuffer_produce(&b);
-        }while (byte != 0x0D);  
-
-        do 
-        {
-            byte = ringbuffer_produce(&b);
-        }while (byte != 0x0D);       
-
-        ringbuffer_consume(&b);
-    
-    }
-    */
+    //Create a task to handler UART event from ISR
+    xTaskCreate(uart_event_task, "uart_event_task", 2048, NULL, 12, NULL);
 }

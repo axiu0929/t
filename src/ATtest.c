@@ -5,16 +5,20 @@
 #include "driver/gpio.h"
 #include <rom/ets_sys.h>
 
-#define GPIO_OUTPUT_IO       GPIO_NUM_3
-#define GPIO_OUTPUT_TEST     GPIO_NUM_27
-#define GPIO_OUTPUT_PIN_SEL  ((1ULL<<GPIO_OUTPUT_IO) | (1ULL<<GPIO_OUTPUT_TEST))
+#define GPIO_INPUT_PIN_SEL   ((1ULL<<UART_RXD) | (1ULL<<UART_CTS))
+#define GPIO_OUTPUT_PIN_SEL  ((1ULL<<UART_TXD) | (1ULL<<UART_RTS))
 
-#define GPIO_INPUT_IO        GPIO_NUM_4
-#define GPIO_INPUT_PIN_SEL   (1ULL<<GPIO_OUTPUT_IO)
+#define UART_TXD GPIO_NUM_4
+#define UART_RXD GPIO_NUM_5
+#define UART_RTS GPIO_NUM_18
+#define UART_CTS GPIO_NUM_19
 
 #define CAPACITY             20
 
 #define ESP_INTR_FLAG_DEFAULT 0
+
+#define ATCOMMAND_NUM    32
+#define ATCOMMAND_LEN    64
 
 void send_byte(char data)
 {
@@ -66,10 +70,9 @@ char receive_byte(void)
     
 }     
 
-void get_res(char *res, int32_t res_size)
+void get_res(char *res)
 {
-
-    for (int32_t i = 0; i < res_size; i++)
+    for (int32_t i = 0; i < ATCOMMAND_LEN; i++)
     {
         res[i] = receive_byte();
         
@@ -79,15 +82,13 @@ void get_res(char *res, int32_t res_size)
         }
         
     }
-
 }
-void send_ATcommand(char *command, char *res, int32_t res_size)
+void send_ATcommand(char *command)
 {
     size_t len = strlen(command);
     for (size_t i = 0; i < len; i++) {
         send_byte(command[i]);
     }
-    get_res(res, res_size);
 }
 
 
@@ -146,26 +147,51 @@ void receive_handler(void* arg)
     //gpio_install_isr_service(ESP_INTR_FLAG_DEFAULT);
 }
 
+/*
+send
+- wait CTS low
+- send by TXD
+
+receive
+- get RI (urc)
+- RTS pulldown
+- uart buffer 1 rec
+- host buffer rec
+- parser
+*/
+
+/*
 void app_main(void)
 {
     gpio_config_t io_conf = {};
     io_conf.intr_type = GPIO_INTR_NEGEDGE;
     io_conf.mode = GPIO_MODE_INPUT_OUTPUT;
-    io_conf.pin_bit_mask = (GPIO_OUTPUT_PIN_SEL | GPIO_INPUT_PIN_SEL);
+    io_conf.pin_bit_mask = (GPIO_INPUT_PIN_SEL | GPIO_OUTPUT_PIN_SEL);
     io_conf.pull_down_en = 0;
     io_conf.pull_up_en = 0;
     gpio_config(&io_conf);
     
-    gpio_set_direction(GPIO_INPUT_IO, GPIO_MODE_INPUT);
-    gpio_set_direction(GPIO_OUTPUT_IO, GPIO_MODE_OUTPUT);
-    //gpio_set_direction(GPIO_OUTPUT_TEST, GPIO_MODE_OUTPUT);    
+    gpio_set_direction(UART_RXD, GPIO_MODE_INPUT);
+    gpio_set_direction(UART_CTS, GPIO_MODE_INPUT);
+    gpio_set_direction(UART_TXD, GPIO_MODE_OUTPUT);  
+    gpio_set_direction(UART_RTS, GPIO_MODE_OUTPUT);  
 
-    gpio_set_level(GPIO_OUTPUT_IO, 1);
+    gpio_set_level(UART_TXD, 1);
     vTaskDelay (1);
     
     // send  
-    char command[64];
-    char res[64];
-    int32_t res_size = 64;
-    send_ATcommand(command, res, res_size);
+    char command[ATCOMMAND_NUM][ATCOMMAND_LEN];
+    char res[ATCOMMAND_LEN];
+
+    while (gpio_get_level(UART_CTS) != 0)
+    {
+        continue;
+    }
+    send_ATcommand(command);
+
+    // receive
+    // RI
+    gpio_set_level(UART_RTS, 0);
+
 }
+*/
