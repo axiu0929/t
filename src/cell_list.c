@@ -28,6 +28,9 @@ OK
 we need: <oper_in_number>,tac,ci,rsrp
 */
 
+// response 存到 response.h 
+// 用 fscanf 逐行讀取檔案 from response.h
+
 /*
 loop until OK
 
@@ -41,4 +44,3 @@ else:
 4G:
 讀到第4個, 存<tac>直到, 存<ci>直到, 存<rsrp>直到, 讀到0x0A or 0x0D
 */
-
