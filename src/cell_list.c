@@ -44,3 +44,12 @@ else:
 4G:
 讀到第4個, 存<tac>直到, 存<ci>直到, 存<rsrp>直到, 讀到0x0A or 0x0D
 */
+
+/*
+void make_cell_list(int RAT)
+{
+    scancontrol(RAT);
+
+    
+}
+*/
