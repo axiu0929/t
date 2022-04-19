@@ -18,8 +18,11 @@ int8_t rssi            // signal strength of AP
 #include "response.h"
 #include "ringbuffer.h"
 
-#define DEFAULT_SCAN_LIST_SIZE 16
-#define OK                     "OK"
+#define DEFAULT_SCAN_LIST_SIZE      16
+#define DEFAULT_CELL_LIST_SIZE      16
+#define DEFAULT_CELL_LIST_INFO_SIZE 32
+#define OK                          "OK"
+#define ERROR                       "ERROR"
 
 typedef struct ap_info
 {
@@ -135,25 +138,95 @@ char* scancontrol(int RAT, char *read_ptr, Ringbuffer *buffer) // return new rea
     ringbuffer_consume(buffer, res, 0x0A);
     printf("%s\n", res);
     ESP_LOGI(TAG, "end");
-    if (!strcmp(res, OK)) {  // OK
+    if ( strcmp(res, OK) == 0) {     // OK
         return read_ptr;
     }
-    else {                   // ERROR
+    else {                        // ERROR
         return NULL;
     }
+}
+
+void get_oper(Ringbuffer *buffer, char *oper)
+{
+    ringbuffer_consume(buffer, NULL, 0);
+    return;
+}
+
+void get_list(int RAT, Ringbuffer *buffer, char *str)
+{
+    // strcat()
+    ringbuffer_consume(buffer, NULL, 0);
+    return;
+}
+
+void make_cell_list(int RAT, char *read_ptr, char list[DEFAULT_CELL_LIST_SIZE][DEFAULT_CELL_LIST_INFO_SIZE])
+{
+    Ringbuffer buffer;
+    ringbuffer_set(&buffer);
+
+    read_ptr = scancontrol(2, read_ptr, &buffer);
+    if (read_ptr == NULL) {
+        ESP_LOGE("scancontrol", "ERROR");
+        return;
+    }
+
+    // send ATcommand
+    printf("AT+QOPS\n");
+    
+    // echo
+    ESP_LOGI("echo", "start");
+    read_ptr = ringbuffer_produce(&buffer, read_ptr);
+    ringbuffer_consume(&buffer, NULL, 0);
+    
+    // 0x0A
+    read_ptr = ringbuffer_produce(&buffer, read_ptr);
+    ringbuffer_consume(&buffer, NULL, 0);
+
+    // res
+    read_ptr = ringbuffer_produce(&buffer, read_ptr);
+    
+    if ( strncmp(buffer.thebuffer, ERROR, 5) == 0 ) {  // res ERROR
+        ESP_LOGE("AT+QOPS", "ERROR");
+        return;
+    }
+
+    char byte = *read_ptr;
+    char oper[16] = {0};
+    int32_t list_len = 0;
+
+    while (byte != 0x0A) {
+        if (byte == '+') {
+            get_oper(&buffer, oper);
+        }
+        else {
+            strcpy(list[list_len], oper);
+            get_list(RAT, &buffer, list[list_len]);
+            list_len++;
+        }  
+        read_ptr = ringbuffer_produce(&buffer, read_ptr); 
+        byte = *read_ptr;
+    }
+
+    // 0x0A
+    read_ptr = ringbuffer_produce(&buffer, read_ptr);
+    ringbuffer_consume(&buffer, NULL, 0);
+    
+    // OK
+    char res[16] = {0};
+    read_ptr = ringbuffer_produce(&buffer, read_ptr);
+    ringbuffer_consume(&buffer, res, 0x0A);
+    if ( strcmp(res, OK) != 0) {     // 不是收到OK
+        ESP_LOGE("AT+QOPS", "ERROR");
+    }
+    ESP_LOGI("AT+QOPS", "OK");
+    return;
 }
 
 void app_main(void)
 {
     //make_wifi_list();
-    Ringbuffer b;
-    ringbuffer_set(&b);
     
     char *read_ptr = gsm;
-    printf("%p\n", read_ptr);
-    read_ptr = scancontrol(2, read_ptr, &b);
-    if (read_ptr != NULL) {
-        ESP_LOGI("main", "end");
-        printf("%p\n", read_ptr);
-    }
+    char list_gsm[DEFAULT_CELL_LIST_SIZE][DEFAULT_CELL_LIST_INFO_SIZE] = {0};
+    make_cell_list(2, read_ptr, list_gsm);
 }
