@@ -8,4 +8,8 @@ src/main.c
 
 #1 scan wifi list: make_wifi_list()
 
-#2 cell list: 需執行3次make_cell_list(), 分別是2、3、4G, 其中get_oper(), get_list()尚未完成
+#2 cell list: cell_list()
+
+output: test/output.txt
+
+data: src/response.h 或是 test底下的 2G.txt 3G.txt 4G.txt
