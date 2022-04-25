@@ -171,7 +171,6 @@ int32_t make_cell_list(int RAT, char *read_ptr, char list[DEFAULT_CELL_LIST_SIZE
     // res
     char byte = *read_ptr;
     read_ptr = ringbuffer_produce(&buffer, read_ptr);
-    
     if ( strncmp(buffer.thebuffer, ERROR, 5) == 0 ) {  // res ERROR
         ESP_LOGE("AT+QOPS", "ERROR");
         return -1;
@@ -241,4 +240,7 @@ void app_main(void)
         printf("%s\n", cell_list[i]);
     }
     
+    printf("ERROR:\n");
+    read_ptr = error;
+    make_cell_list(4, read_ptr, cell_list);
 }
