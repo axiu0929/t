@@ -1,0 +1,171 @@
+--- Available filters and text transformations: colorize, debug, default, direct, esp32_exception_decoder, hexlify, log2file, nocontrol, printable, 
+send_on_enter, time
+--- More details at https://bit.ly/pio-monitor-filters
+
+Please build project in debug configuration to get more details about an exception.
+See https://docs.platformio.org/page/projectconf/build_configurations.html
+
+
+--- Miniterm on COM3  115200,8,N,1 ---
+--- Quit: Ctrl+C | Menu: Ctrl+T | Help: Ctrl+T followed by Ctrl+H ---
+ets Jun  8 2016 00:22:57
+
+rst:0x1 (POWERON_RESET),boot:0x13 (SPI_FAST_FLASH_BOOT)
+configsip: 0, SPIWP:0xee
+clk_drv:0x00,q_drv:0x00,d_drv:0x00,cs0_drv:0x00,hd_drv:0x00,wp_drv:0x00
+mode:DIO, clock div:2
+load:0x3fff0030,len:7580
+ho 0 tail 12 room 4
+load:0x40078000,len:14912
+load:0x40080400,len:3688
+entry 0x4008067c
+I (28) boot: ESP-IDF 4.3.2 2nd stage bootloader
+I (28) boot: compile time 18:13:18
+I (28) boot: chip revision: 1
+I (31) boot_comm: chip revision: 1, min. bootloader chip revision: 0
+I (38) boot.esp32: SPI Speed      : 40MHz
+I (43) boot.esp32: SPI Mode       : DIO
+I (47) boot.esp32: SPI Flash Size : 4MB
+I (52) boot: Enabling RNG early entropy source...
+I (57) boot: Partition Table:
+I (61) boot: ## Label            Usage          Type ST Offset   Length
+I (68) boot:  0 nvs              WiFi data        01 02 00009000 00006000
+I (76) boot:  1 phy_init         RF data          01 01 0000f000 00001000
+I (83) boot:  2 factory          factory app      00 00 00010000 00100000
+I (91) boot: End of partition table
+I (95) boot_comm: chip revision: 1, min. application chip revision: 0
+I (102) esp_image: segment 0: paddr=00010020 vaddr=3f400020 size=13f48h ( 81736) map
+I (140) esp_image: segment 1: paddr=00023f70 vaddr=3ffb0000 size=045c4h ( 17860) load
+I (147) esp_image: segment 2: paddr=0002853c vaddr=40080000 size=07adch ( 31452) load
+I (160) esp_image: segment 3: paddr=00030020 vaddr=400d0020 size=6b690h (439952) map
+I (320) esp_image: segment 4: paddr=0009b6b8 vaddr=40087adc size=0d520h ( 54560) load
+I (343) esp_image: segment 5: paddr=000a8be0 vaddr=50000000 size=00010h (    16) load
+I (353) boot: Loaded app from partition at offset 0x10000
+I (353) boot: Disabling RNG early entropy source...
+I (365) cpu_start: Pro cpu up.
+I (365) cpu_start: Starting app cpu, entry point is 0x40081280
+I (0) cpu_start: App cpu up.
+I (379) cpu_start: Pro cpu start user code
+I (379) cpu_start: cpu freq: 160000000
+I (379) cpu_start: Application information:
+I (384) cpu_start: Project name:     wifi
+I (388) cpu_start: App version:      af9cb05-dirty
+I (394) cpu_start: Compile time:     Apr 25 2022 18:12:01
+I (400) cpu_start: ELF file SHA256:  8b89b1bc0ce735c0...
+I (406) cpu_start: ESP-IDF:          4.3.2
+I (411) heap_init: Initializing. RAM available for dynamic allocation:
+I (418) heap_init: At 3FFAE6E0 len 00001920 (6 KiB): DRAM
+I (424) heap_init: At 3FFB8300 len 00027D00 (159 KiB): DRAM
+I (430) heap_init: At 3FFE0440 len 00003AE0 (14 KiB): D/IRAM
+I (437) heap_init: At 3FFE4350 len 0001BCB0 (111 KiB): D/IRAM
+I (443) heap_init: At 40094FFC len 0000B004 (44 KiB): IRAM
+I (451) spi_flash: detected chip: generic
+I (454) spi_flash: flash io: dio
+I (459) cpu_start: Starting scheduler on PRO CPU.
+I (0) cpu_start: Starting scheduler on APP CPU.
+I (560) wifi:wifi driver task: 3ffc1f48, prio:23, stack:6656, core=0
+I (560) system_api: Base MAC address is not set
+I (560) system_api: read default base MAC address from EFUSE
+I (580) wifi:wifi firmware version: eb52264
+I (580) wifi:wifi certification version: v7.0
+I (580) wifi:config NVS flash: enabled
+I (580) wifi:config nano formating: disabled
+I (590) wifi:Init data frame dynamic rx buffer num: 32
+I (590) wifi:Init management frame dynamic rx buffer num: 32
+I (600) wifi:Init management short buffer num: 32
+I (600) wifi:Init dynamic tx buffer num: 32
+I (610) wifi:Init static rx buffer size: 1600
+I (610) wifi:Init static rx buffer num: 10
+I (610) wifi:Init dynamic rx buffer num: 32
+I (620) wifi_init: rx ba win: 6
+I (620) wifi_init: tcpip mbox: 32
+I (630) wifi_init: udp mbox: 6
+I (630) wifi_init: tcp mbox: 6
+I (630) wifi_init: tcp tx win: 5744
+I (640) wifi_init: tcp rx win: 5744
+I (640) wifi_init: tcp mss: 1440
+I (650) wifi_init: WiFi IRAM OP enabled
+I (650) wifi_init: WiFi RX IRAM OP enabled
+I (660) phy_init: phy_version 4670,719f9f6,Feb 18 2021,17:07:07
+I (760) wifi:mode : sta (24:0a:c4:c1:21:98)
+I (760) wifi:enable tsf
+I (2860) scan: Total APs scanned = 23
+BSSID: F81A67B6ED4A RSSI: -66
+BSSID: 801F02EF4F6C RSSI: -74
+BSSID: 1CABC0C63E18 RSSI: -75
+BSSID: F85B3B76C9C0 RSSI: -80
+BSSID: 0EEBB6271050 RSSI: -81
+BSSID: 10FEEDECB7A8 RSSI: -81
+BSSID: 206A94ABE258 RSSI: -81
+BSSID: CCB255570996 RSSI: -81
+BSSID: 6802B85E4E71 RSSI: -84
+BSSID: BC0F9A66A9DF RSSI: -85
+BSSID: C8BE19022EE0 RSSI: -86
+BSSID: 04D4C4BAA4A0 RSSI: -87
+BSSID: AC202EB737B8 RSSI: -87
+BSSID: A8637D9B653A RSSI: -88
+BSSID: 404A038F3EA4 RSSI: -88
+BSSID: 840B7C5EF486 RSSI: -89
+I (2890) str: F81A67B6ED4A-66
+I (2900) str: 801F02EF4F6C-74
+I (2900) str: 1CABC0C63E18-75
+I (2900) str: F85B3B76C9C0-80
+I (2910) str: 0EEBB6271050-81
+I (2910) str: 10FEEDECB7A8-81
+I (2910) str: 206A94ABE258-81
+I (2920) str: CCB255570996-81
+I (2920) str: 6802B85E4E71-84
+I (2930) str: BC0F9A66A9DF-85
+I (2930) str: C8BE19022EE0-86
+I (2930) str: 04D4C4BAA4A0-87
+I (2940) str: AC202EB737B8-87
+I (2940) str: A8637D9B653A-88
+I (2940) str: 404A038F3EA4-88
+I (2950) str: 840B7C5EF486-89
+2G:
+AT+QOPSCFG="scancontrol",0
+OK
+AT+QOPS
+466,05,462,1332,63
+466,05,462,1288,50
+466,05,462,1334,45
+466,05,462,128A,41
+3G:
+AT+QOPSCFG="scancontrol",1
+OK
+AT+QOPS
+466,01,23B7,725707,-63
+466,92,27F7,E73B0D,-63
+466,89,83F,D37A6E,-66
+466,97,2B6C,8C03A4,-70
+4G:
+AT+QOPSCFG="scancontrol",2
+OK
+AT+QOPS
+466,05,2AF9,1879D13,-61
+466,05,2AF9,1879D11,-62
+466,05,2AF9,1892D14,-97
+466,05,2AF9,1892D34,-101
+466,12,2AF9,1879D13,-61
+466,12,2AF9,1879D11,-62
+466,01,BFF7,187B51F,-67
+466,01,BFF7,187B523,-81
+466,01,BFF7,187B523,-82
+466,01,BFF7,18DD316,-86
+466,01,BFF7,187C221,-91
+466,89,2794,186E801,-70
+466,97,2C88,186D370,-73
+466,97,2C88,186BCE9,-80
+466,97,2C88,186D38E,-85
+466,97,2C88,186D38E,-86
+466,92,2B5C,3413120,-75
+466,92,2B5C,3484D0D,-75
+466,92,2B5C,3484D0B,-80
+466,92,2B5C,3413123,-84
+466,92,2B5C,3413122,-90
+466,92,2B5E,3427A10,-112
+ERROR:
+AT+QOPSCFG="scancontrol",2
+OK
+AT+QOPS
+E (3030) AT+QOPS: ERROR

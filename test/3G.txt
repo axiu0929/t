@@ -1,0 +1,15 @@
+AT+QOPSCFG="scancontrol",1
+
+OK
+AT+QOPS 
+
++QOPS: "Far EasTone","FET","46601"
+1,"3G",10613,92,23B7,725707,-63,7,0
++QOPS: "Chunghwa Telecom","Chunghwa","46692"
+1,"3G",10762,470,27F7,E73B0D,-63,7,0
++QOPS: "T Star","T Star","46689"
+1,"3G",10638,335,83F,D37A6E,-66,16,0
++QOPS: "TW Mobile","TWM","46697"
+1,"3G",10738,377,2B6C,8C03A4,-70,12,0
+
+OK
