@@ -148,7 +148,11 @@ char* scancontrol(int RAT, char *read_ptr, Ringbuffer *buffer) // return new rea
 
 void get_oper(Ringbuffer *buffer, char *oper)
 {
-    ringbuffer_consume(buffer, NULL, 0);
+    ringbuffer_consume(buffer, NULL, ',');
+    ringbuffer_consume(buffer, NULL, ',');
+    ringbuffer_del(buffer);
+    ringbuffer_consume(buffer, oper, '"');
+    ringbuffer_del(buffer);
     return;
 }
 
@@ -164,7 +168,7 @@ void make_cell_list(int RAT, char *read_ptr, char list[DEFAULT_CELL_LIST_SIZE][D
     Ringbuffer buffer;
     ringbuffer_set(&buffer);
 
-    read_ptr = scancontrol(2, read_ptr, &buffer);
+    read_ptr = scancontrol(RAT, read_ptr, &buffer);
     if (read_ptr == NULL) {
         ESP_LOGE("scancontrol", "ERROR");
         return;
@@ -183,6 +187,7 @@ void make_cell_list(int RAT, char *read_ptr, char list[DEFAULT_CELL_LIST_SIZE][D
     ringbuffer_consume(&buffer, NULL, 0);
 
     // res
+    char byte = *read_ptr;
     read_ptr = ringbuffer_produce(&buffer, read_ptr);
     
     if ( strncmp(buffer.thebuffer, ERROR, 5) == 0 ) {  // res ERROR
@@ -190,25 +195,27 @@ void make_cell_list(int RAT, char *read_ptr, char list[DEFAULT_CELL_LIST_SIZE][D
         return;
     }
 
-    char byte = *read_ptr;
     char oper[16] = {0};
     int32_t list_len = 0;
 
     while (byte != 0x0A) {
+        printf("byte: %c\n", byte);
         if (byte == '+') {
             get_oper(&buffer, oper);
+            printf("%s\n", oper);
         }
         else {
             strcpy(list[list_len], oper);
             get_list(RAT, &buffer, list[list_len]);
             list_len++;
         }  
-        read_ptr = ringbuffer_produce(&buffer, read_ptr); 
+        
         byte = *read_ptr;
+        read_ptr = ringbuffer_produce(&buffer, read_ptr); 
+        
     }
 
     // 0x0A
-    read_ptr = ringbuffer_produce(&buffer, read_ptr);
     ringbuffer_consume(&buffer, NULL, 0);
     
     // OK
@@ -226,7 +233,10 @@ void app_main(void)
 {
     //make_wifi_list();
     
-    char *read_ptr = gsm;
-    char list_gsm[DEFAULT_CELL_LIST_SIZE][DEFAULT_CELL_LIST_INFO_SIZE] = {0};
-    make_cell_list(2, read_ptr, list_gsm);
+    char *read_ptr[3] = {gsm, wcdma, lte};
+    char list_gsm[3][DEFAULT_CELL_LIST_SIZE][DEFAULT_CELL_LIST_INFO_SIZE] = {0};
+
+    make_cell_list(2, read_ptr[0], list_gsm[0]);
+    make_cell_list(3, read_ptr[1], list_gsm[1]);
+    make_cell_list(4, read_ptr[2], list_gsm[2]);
 }
