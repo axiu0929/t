@@ -13,99 +13,19 @@ int8_t rssi            // signal strength of AP
 #include "esp_wifi.h"
 #include "esp_log.h"
 #include "esp_event.h"
-//#include "nvs_flash.h"
+#include "nvs_flash.h"
 
 #include "response.h"
 #include "ringbuffer.h"
+//#include "str.h"
 
 #define DEFAULT_SCAN_LIST_SIZE      16
-#define DEFAULT_CELL_LIST_SIZE      32
+
+#define DEFAULT_CELL_LIST_SIZE       32
 #define DEFAULT_CELL_LIST_INFO_SIZE 32
 #define OK                          "OK"
 #define ERROR                       "ERROR"
 
-typedef struct ap_info
-{
-    uint8_t bssid[6];       // MAC address of AP
-    int8_t rssi;            // signal strength of AP
-}AP_info;
-
-
-/* Initialize Wi-Fi as sta and set scan method */
-uint16_t wifi_scan(AP_info *AP_list)
-{
-    ESP_ERROR_CHECK(esp_netif_init());
-    ESP_ERROR_CHECK(esp_event_loop_create_default());
-    esp_netif_t *sta_netif = esp_netif_create_default_wifi_sta();
-    assert(sta_netif);
-    
-
-    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
-    ESP_ERROR_CHECK(esp_wifi_init(&cfg));
-
-    uint16_t number = DEFAULT_SCAN_LIST_SIZE;
-    wifi_ap_record_t ap_info[DEFAULT_SCAN_LIST_SIZE];
-    uint16_t ap_count = 0;
-    memset(ap_info, 0, sizeof(ap_info));
-
-    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
-    ESP_ERROR_CHECK(esp_wifi_start());
-    esp_wifi_scan_start(NULL, true);
-    ESP_ERROR_CHECK(esp_wifi_scan_get_ap_records(&number, ap_info));
-    ESP_ERROR_CHECK(esp_wifi_scan_get_ap_num(&ap_count));
-    ESP_LOGI("scan", "Total APs scanned = %u", ap_count);
-    for (int i = 0; (i < DEFAULT_SCAN_LIST_SIZE) && (i < ap_count); i++) {
-        //ESP_LOGI(TAG, "RSSI \t\t%d", ap_info[i].rssi);
-        //printf("BSSID: ");
-        for (int j = 0; j < 6; j++) {
-            AP_list[i].bssid[j] = ap_info[i].bssid[j];
-            //printf("%02x ", ap_info[i].bssid[j]);
-        }
-        //printf("\n");
-        AP_list[i].rssi = ap_info[i].rssi;
-    }
-    return ap_count;
-}
-
-void make_wifi_list(void)
-{
-    // Initialize NVS
-    esp_err_t ret = nvs_flash_init();
-    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-        ESP_ERROR_CHECK(nvs_flash_erase());
-        ret = nvs_flash_init();
-    }
-    ESP_ERROR_CHECK( ret );
-
-    // scan
-    AP_info AP_list[DEFAULT_SCAN_LIST_SIZE];
-    memset(AP_list, 0, sizeof(AP_list));
-    
-    uint16_t AP_count = 0;
-    AP_count = wifi_scan(AP_list);
-    
-    // log info
-    for (int i = 0; i < AP_count ; i++) {
-        //ESP_LOGI(TAG, "RSSI \t\t%d", ap_info[i].rssi);
-        printf("BSSID: ");
-        for (int j = 0; j < 6; j++) {
-            printf("%02X", AP_list[i].bssid[j]);
-        }
-        printf(" RSSI: %d\n", AP_list[i].rssi);
-    }
-
-    // convert to string (opt.)
-    char AP_list_str[DEFAULT_SCAN_LIST_SIZE][32];
-    for (int i = 0; i < AP_count ; i++) {
-        for (int j = 0; j < 6; j++) {
-            sprintf(&AP_list_str[i][2*j], "%02X",  AP_list[i].bssid[j]);
-        }
-        sprintf(&AP_list_str[i][12], "%d",  AP_list[i].rssi);
-    }
-    for (int i = 0; i < AP_count ; i++) {
-        ESP_LOGI("str", "%s", AP_list_str[i]);
-    }  
-}
 
 // AT+QOPSCFG="scancontrol",<RAT>
 char* scancontrol(int RAT, char *read_ptr, Ringbuffer *buffer) // return new read_ptr 
@@ -138,7 +58,7 @@ char* scancontrol(int RAT, char *read_ptr, Ringbuffer *buffer) // return new rea
     ringbuffer_consume(buffer, res, 0x0A);
     printf("%s\n", res);
     //ESP_LOGI(TAG, "end");
-    if ( strcmp(res, OK) == 0) {     // OK
+    if ( strncmp(res, OK, 2) == 0) {     // OK
         return read_ptr;
     }
     else {                        // ERROR
@@ -226,7 +146,7 @@ void get_list(int RAT, Ringbuffer *buffer, char *str)
     return;
 }
 
-void make_cell_list(int RAT, char *read_ptr, char list[DEFAULT_CELL_LIST_SIZE][DEFAULT_CELL_LIST_INFO_SIZE])
+int32_t make_cell_list(int RAT, char *read_ptr, char list[DEFAULT_CELL_LIST_SIZE][DEFAULT_CELL_LIST_INFO_SIZE])
 {
     Ringbuffer buffer;
     ringbuffer_set(&buffer);
@@ -234,7 +154,7 @@ void make_cell_list(int RAT, char *read_ptr, char list[DEFAULT_CELL_LIST_SIZE][D
     read_ptr = scancontrol(RAT, read_ptr, &buffer);
     if (read_ptr == NULL) {
         ESP_LOGE("scancontrol", "ERROR");
-        return;
+        return -1;
     }
 
     // send ATcommand
@@ -254,7 +174,7 @@ void make_cell_list(int RAT, char *read_ptr, char list[DEFAULT_CELL_LIST_SIZE][D
     
     if ( strncmp(buffer.thebuffer, ERROR, 5) == 0 ) {  // res ERROR
         ESP_LOGE("AT+QOPS", "ERROR");
-        return;
+        return -1;
     }
 
     char oper[16] = {0};
@@ -284,57 +204,41 @@ void make_cell_list(int RAT, char *read_ptr, char list[DEFAULT_CELL_LIST_SIZE][D
     char res[16] = {0};
     read_ptr = ringbuffer_produce(&buffer, read_ptr);
     ringbuffer_consume(&buffer, res, 0x0A);
-    if ( strcmp(res, OK) != 0) {     // 不是收到OK
+    if ( strncmp(res, OK, 2) != 0) {     // 不是收到OK
         ESP_LOGE("AT+QOPS", "ERROR");
     }
     //ESP_LOGI("AT+QOPS", "OK");
-    return;
+    return list_len;
 }
 
 void app_main(void)
 {
     //make_wifi_list();
     
-    
-    char *read_ptr[3] = {gsm, wcdma, lte};
-    char cell_list[3][DEFAULT_CELL_LIST_SIZE][DEFAULT_CELL_LIST_INFO_SIZE] = {0};
-
-    for (int i = 0; i < 3; i++) {
-        make_cell_list(i+2, read_ptr[i], cell_list[i]);
-        
-        for (int j = 0; (j < DEFAULT_CELL_LIST_SIZE) && (cell_list[i][j][0] != 0); j++) {
-            printf("%s\n", cell_list[i][j]);
-        }
-        
-    }
-    
-
     char *read_ptr;
-    char gsm_list[DEFAULT_CELL_LIST_SIZE][DEFAULT_CELL_LIST_INFO_SIZE] = {0};
-    char wcdma_list[DEFAULT_CELL_LIST_SIZE][DEFAULT_CELL_LIST_INFO_SIZE] = {0};
-    char lte_list[DEFAULT_CELL_LIST_SIZE][DEFAULT_CELL_LIST_INFO_SIZE] = {0};
-    
-    
+    char cell_list[DEFAULT_CELL_LIST_SIZE][DEFAULT_CELL_LIST_INFO_SIZE] = {0};
+    int32_t list_len = 0;
+
     printf("2G:\n");
     read_ptr = gsm;
-    make_cell_list(2, read_ptr, gsm_list);
-    for (int i = 0; (i < DEFAULT_CELL_LIST_SIZE) && (gsm_list[i][0] != 0); i++) {
-        printf("%s\n", gsm_list[i]);
+    list_len = make_cell_list(2, read_ptr, cell_list);
+    for (int i = 0; i < list_len; i++) {
+        printf("%s\n", cell_list[i]);
     }
     
     printf("3G:\n");
     read_ptr = wcdma;
-    make_cell_list(3, read_ptr, wcdma_list);
-    for (int i = 0; (i < DEFAULT_CELL_LIST_SIZE) && (wcdma_list[i][0] != 0); i++) {
-        printf("%s\n", wcdma_list[i]);
+    list_len = make_cell_list(3, read_ptr, cell_list);
+    for (int i = 0; i < list_len; i++) {
+        printf("%s\n", cell_list[i]);
     }
     
     printf("4G:\n");
     read_ptr = lte;
-    make_cell_list(4, read_ptr, lte_list);
+    list_len = make_cell_list(4, read_ptr, cell_list);
     
-    for (int i = 0; (i < DEFAULT_CELL_LIST_SIZE) && (lte_list[i][0] != 0); i++) {
-        printf("%s\n", lte_list[i]);
+    for (int i = 0; i < list_len; i++) {
+        printf("%s\n", cell_list[i]);
     }
     
 }

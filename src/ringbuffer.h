@@ -14,15 +14,15 @@ void ringbuffer_set(Ringbuffer *buffer)
     buffer->tail = -1;
 }
 
-bool ringbuffer_add(Ringbuffer *buffer, char byte)
+int ringbuffer_add(Ringbuffer *buffer, char byte)
 {
     if ( ((buffer->tail + 1) % CAPACITY) == buffer->head) {
-        return false; // buffer is full
+        return 0; // buffer is full
     }
     else {
         buffer->tail = (buffer->tail + 1) % CAPACITY;
         (buffer->thebuffer)[buffer->tail] = byte;
-        return true;
+        return 1;
     } 
     
 }
